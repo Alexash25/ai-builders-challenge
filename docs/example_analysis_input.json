@@ -1,0 +1,124 @@
+{
+  "project": {
+    "goal": "Teach beginners how to use Git branching in under 90 seconds",
+    "platform": "YouTube",
+    "audience": "Software engineering students with no prior Git experience",
+    "tone": "Casual and encouraging",
+    "target_length_seconds": 90.0
+  },
+  "video": {
+    "duration_seconds": 97.4,
+    "fps": 30.0,
+    "width": 1920,
+    "height": 1080
+  },
+  "transcript_segments": [
+    {
+      "id": "seg_001",
+      "start": 0.0,
+      "end": 5.2,
+      "text": "Hey everyone, welcome back. Today we are going to talk about Git branching."
+    },
+    {
+      "id": "seg_002",
+      "start": 5.2,
+      "end": 14.0,
+      "text": "Branching lets you work on new features without touching the main codebase. Think of it like a parallel universe for your code."
+    },
+    {
+      "id": "seg_003",
+      "start": 17.5,
+      "end": 28.1,
+      "text": "To create a branch, just type git checkout dash b and then your branch name. It is that simple."
+    },
+    {
+      "id": "seg_004",
+      "start": 28.1,
+      "end": 41.6,
+      "text": "Now you can make changes, commit them, and your main branch stays completely untouched. When you are ready, you merge back in."
+    },
+    {
+      "id": "seg_005",
+      "start": 45.0,
+      "end": 60.3,
+      "text": "Here is a quick demo. I will create a branch called feature-login, add a file, commit it, and then switch back to main."
+    },
+    {
+      "id": "seg_006",
+      "start": 60.3,
+      "end": 75.8,
+      "text": "See? Main is clean. The new file only exists on the feature branch. This is the core workflow used by every professional team."
+    },
+    {
+      "id": "seg_007",
+      "start": 80.0,
+      "end": 92.1,
+      "text": "That is basically it. Try creating your first branch today and let me know in the comments how it goes. See you next time."
+    }
+  ],
+  "findings": [
+    {
+      "id": "find_001",
+      "category": "audio",
+      "start": 14.0,
+      "end": 17.5,
+      "metric": "silence_duration_seconds",
+      "value": 3.5,
+      "interpretation": "3.5 seconds of silence detected between segments — likely an unintended pause"
+    },
+    {
+      "id": "find_002",
+      "category": "audio",
+      "start": 41.6,
+      "end": 45.0,
+      "metric": "silence_duration_seconds",
+      "value": 3.4,
+      "interpretation": "3.4 seconds of silence before the demo section — pacing gap"
+    },
+    {
+      "id": "find_003",
+      "category": "audio",
+      "start": 75.8,
+      "end": 80.0,
+      "metric": "silence_duration_seconds",
+      "value": 4.2,
+      "interpretation": "4.2 seconds of silence near the end — likely dead air before the outro"
+    },
+    {
+      "id": "find_004",
+      "category": "audio",
+      "start": 0.0,
+      "end": 97.4,
+      "metric": "rms_volume_db",
+      "value": -18.3,
+      "interpretation": "Average RMS volume is -18.3 dB — slightly below the recommended -14 dB for online video"
+    },
+    {
+      "id": "find_005",
+      "category": "visual",
+      "start": 0.0,
+      "end": 5.0,
+      "metric": "mean_brightness",
+      "value": 210,
+      "interpretation": "Opening frame is very bright (210/255) — may appear washed out on some displays"
+    },
+    {
+      "id": "find_006",
+      "category": "visual",
+      "start": 45.0,
+      "end": 50.0,
+      "metric": "blur_score",
+      "value": 28.4,
+      "interpretation": "Laplacian variance of 28.4 indicates a slightly soft frame — below the 50.0 sharpness threshold"
+    },
+    {
+      "id": "find_007",
+      "category": "pacing",
+      "start": 28.1,
+      "end": 45.0,
+      "metric": "scene_cut",
+      "value": 1,
+      "interpretation": "Scene cut detected at 28.1 seconds — transition between explanation and demo section"
+    }
+  ]
+}

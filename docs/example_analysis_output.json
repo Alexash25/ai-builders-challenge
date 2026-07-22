@@ -1,0 +1,94 @@
+{
+  "summary": "This tutorial video has a clear structure and a friendly tone that suits the beginner audience well. The core Git branching concept is explained concisely and the live demo is the strongest section. The main issues holding the video back are three noticeable silence gaps totalling 11 seconds, audio that is slightly too quiet for the YouTube platform, and a rushed outro that does not give viewers a clear next step. Addressing the silence gaps alone would meaningfully improve perceived pacing and bring the runtime closer to the 90-second target.",
+  "scores": {
+    "story": 74,
+    "pacing": 52,
+    "audio": 61,
+    "visuals": 68,
+    "accessibility": 38
+  },
+  "timeline_feedback": [
+    {
+      "id": "fb_001",
+      "start": 14.0,
+      "end": 17.5,
+      "category": "pacing",
+      "severity": "high",
+      "evidence_ids": ["find_001"],
+      "explanation": "A 3.5-second silence gap between the branching explanation and the command demo will cause viewers to disengage. On YouTube, attention drops sharply after 2 seconds of dead air.",
+      "suggestion": "Cut this pause entirely, or add a quick bridging line such as 'Here is how you do it' to maintain momentum.",
+      "automatic_fix": "silence_removal"
+    },
+    {
+      "id": "fb_002",
+      "start": 41.6,
+      "end": 45.0,
+      "category": "pacing",
+      "severity": "high",
+      "evidence_ids": ["find_002"],
+      "explanation": "Another 3.4-second silence before the demo section. Combined with the previous gap this creates a pattern of interrupted pacing that undermines the casual, energetic tone stated in your brief.",
+      "suggestion": "Trim this silence. Consider adding a screen transition or title card to fill the cut cleanly.",
+      "automatic_fix": "silence_removal"
+    },
+    {
+      "id": "fb_003",
+      "start": 75.8,
+      "end": 80.0,
+      "category": "pacing",
+      "severity": "medium",
+      "evidence_ids": ["find_003"],
+      "explanation": "4.2 seconds of silence before the outro. This is the longest gap in the video and lands at a moment when viewer retention is already declining.",
+      "suggestion": "Cut or shorten this pause. If you need a breath moment, keep it under 1 second.",
+      "automatic_fix": "silence_removal"
+    },
+    {
+      "id": "fb_004",
+      "start": 0.0,
+      "end": 97.4,
+      "category": "audio",
+      "severity": "medium",
+      "evidence_ids": ["find_004"],
+      "explanation": "The overall audio level averages -18.3 dB RMS, which is quieter than YouTube's recommended -14 dB. Viewers on mobile devices or laptops with weaker speakers may struggle to hear clearly.",
+      "suggestion": "Normalize the audio track to -14 dB LUFS before export. Most editing tools do this in one click.",
+      "automatic_fix": null
+    },
+    {
+      "id": "fb_005",
+      "start": 80.0,
+      "end": 97.4,
+      "category": "story",
+      "severity": "low",
+      "evidence_ids": ["seg_007"],
+      "explanation": "The outro is only 12 seconds and ends with a passive call to action ('let me know in the comments'). For a tutorial targeting beginners, a more concrete next step would improve completion and engagement.",
+      "suggestion": "Add one specific action: 'Try running git checkout -b my-first-branch right now and reply with a screenshot.' This is more actionable and fits the encouraging tone of your brief.",
+      "automatic_fix": null
+    }
+  ],
+  "recommended_edits": [
+    {
+      "id": "edit_001",
+      "label": "Remove 3 silence gaps",
+      "description": "Trim the three detected silence gaps at 14.0s, 41.6s, and 75.8s. This will reduce total runtime by approximately 11 seconds and noticeably improve pacing. This edit can be applied automatically.",
+      "edit_type": "silence_removal",
+      "automatic_fix_eligible": true,
+      "priority": 1
+    },
+    {
+      "id": "edit_002",
+      "label": "Normalize audio to -14 dB",
+      "description": "Raise the overall audio level to -14 dB LUFS to meet YouTube's recommended loudness target. Apply in your export settings or with an audio normalization pass.",
+      "edit_type": "audio_normalization",
+      "automatic_fix_eligible": false,
+      "priority": 2
+    },
+    {
+      "id": "edit_003",
+      "label": "Strengthen the outro call to action",
+      "description": "Replace the passive outro with a specific, actionable challenge for beginners. Record a 10-15 second replacement and drop it in at the 80-second mark.",
+      "edit_type": "script_revision",
+      "automatic_fix_eligible": false,
+      "priority": 3
+    }
+  ],
+  "revised_script": "Hey everyone, welcome back. Today we are going to talk about Git branching.\n\nBranching lets you work on new features without touching the main codebase. Think of it like a parallel universe for your code. To create a branch, just type git checkout dash b and then your branch name. It is that simple.\n\nNow you can make changes, commit them, and your main branch stays completely untouched. When you are ready, you merge back in. Here is a quick demo. I will create a branch called feature-login, add a file, commit it, and then switch back to main.\n\nSee? Main is clean. The new file only exists on the feature branch. This is the core workflow used by every professional team.\n\nThat is basically it. Your challenge: open your terminal right now, run git checkout dash b my-first-branch, and reply to this video with a screenshot. It takes 30 seconds and you will never forget how branching works. See you next time."
+}
