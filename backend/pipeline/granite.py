@@ -115,7 +115,7 @@ def _call_granite(
     user_prompt: str,
     inp: AnalysisInput,
 ) -> AnalysisOutput:
-    """Call watsonx.ai and validate the response. One retry on bad JSON."""
+    """Call watsonx.ai chat API and validate the response. One retry on bad JSON."""
     try:
         from ibm_watsonx_ai import Credentials
         from ibm_watsonx_ai.foundation_models import ModelInference
@@ -134,10 +134,13 @@ def _call_granite(
         params={"max_new_tokens": 2048, "temperature": 0.1},
     )
 
-    prompt = f"<|system|>\n{system_prompt}\n<|user|>\n{user_prompt}\n<|assistant|>\n"
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user",   "content": user_prompt},
+    ]
 
     t0 = time.time()
-    response = str(model.generate_text(prompt=prompt))
+    response = _chat(model, messages)
     latency = round(time.time() - t0, 2)
     log.info("Granite response latency=%.2fs", latency)
 
@@ -145,21 +148,34 @@ def _call_granite(
     if output:
         return output
 
-    # Retry once with the validation error appended to the prompt
+    # Retry once — append the validation error as a follow-up user message
     log.warning("Granite first attempt invalid — retrying. error=%s", error)
-    retry_prompt = (
-        prompt
-        + response
-        + f"\n\nThe above response failed validation: {error}\n"
-        + "Fix the JSON and return ONLY the corrected object.\n<|assistant|>\n"
-    )
-    response2 = str(model.generate_text(prompt=retry_prompt))
+    messages.append({"role": "assistant", "content": response})
+    messages.append({
+        "role": "user",
+        "content": (
+            f"The above response failed validation: {error}\n"
+            "Fix the JSON and return ONLY the corrected object."
+        ),
+    })
+    response2 = _chat(model, messages)
     output2, error2 = _parse_and_validate(response2, inp)
     if output2:
         return output2
 
     log.error("Granite retry also failed. error=%s raw=%s", error2, response2[:500])
     return _SAFE_FALLBACK
+
+
+def _chat(model: "ModelInference", messages: list) -> str:  # type: ignore[name-defined]
+    """Call the chat API and return the assistant reply as a plain string."""
+    result = model.chat(messages=messages)
+    # result shape: {"choices": [{"message": {"content": "..."}}], ...}
+    try:
+        return str(result["choices"][0]["message"]["content"])
+    except (KeyError, IndexError, TypeError):
+        # Fallback: stringify the whole response so _parse_and_validate can report the error
+        return str(result)
 
 
 def _parse_and_validate(raw: str, inp: AnalysisInput):

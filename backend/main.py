@@ -18,13 +18,17 @@ import pathlib
 import uuid
 from typing import Any
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from backend.config import settings
-from backend.schemas import AnalysisOutput, ProjectBrief
+from backend.pipeline.editor import apply_silence_removal
+from backend.pipeline.extractor import extract_evidence
+from backend.pipeline.granite import analyze as granite_analyze
+from backend.schemas import Finding, ProjectBrief
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -49,6 +53,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Serve rendered preview files as static assets
+_uploads_dir = pathlib.Path(settings.upload_dir)
+_uploads_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(_uploads_dir)), name="uploads")
 
 # ---------------------------------------------------------------------------
 # In-memory project state  (MVP: no database)
@@ -221,37 +230,72 @@ async def upload_media(project_id: str, file: UploadFile = File(...)):
 
 
 @app.post("/api/projects/{project_id}/analyze", response_model=AnalyzeResponse)
-def trigger_analysis(project_id: str):
+def trigger_analysis(project_id: str, background_tasks: BackgroundTasks):
     """
     Trigger analysis.
-    In mock mode (USE_MOCK_AI=true): returns a complete AnalysisOutput immediately.
-    In real mode: queues background processing (Sub-Task 5).
+    If analysis is already completed, returns cached result immediately.
+    Otherwise queues a background task and returns status: queued.
     """
     state = _require_project(project_id)
 
-    if settings.use_mock_ai:
-        mock_data = _load_mock_output()
-        # Validate against schema before storing
-        AnalysisOutput.model_validate(mock_data)
-        state["analysis_output"] = mock_data
-        state["status"] = "completed"
-        state["progress_message"] = "Analysis complete (mock mode)."
-        log.info("project=%s analysis complete (mock)", project_id)
+    # Return cached result if already done
+    if state["status"] == "completed" and state["analysis_output"] is not None:
+        log.info("project=%s analysis already completed — returning cached", project_id)
         return AnalyzeResponse(
             project_id=project_id,
             status="completed",
-            message="Mock analysis complete. Retrieve results from GET /analysis.",
+            message="Analysis already complete. Retrieve results from GET /analysis.",
         )
 
-    # Real pipeline — Sub-Task 5 will wire this up
+    if state["media_path"] is None:
+        raise HTTPException(status_code=400, detail="Upload a video before triggering analysis.")
+
     state["status"] = "queued"
     state["progress_message"] = "Analysis queued."
-    log.info("project=%s analysis queued (real mode)", project_id)
+    background_tasks.add_task(_run_analysis, project_id)
+    log.info("project=%s analysis queued", project_id)
     return AnalyzeResponse(
         project_id=project_id,
         status="queued",
         message="Analysis queued. Poll GET /status for progress.",
     )
+
+
+def _run_analysis(project_id: str) -> None:
+    """Background worker: extract evidence → call Granite → persist result."""
+    state = projects.get(project_id)
+    if state is None:
+        return
+
+    try:
+        state["status"] = "processing"
+        state["progress_message"] = "Extracting media evidence…"
+        log.info("project=%s analysis started", project_id)
+
+        brief = state["brief"]
+        media_path = state["media_path"]
+
+        # Step 1 — extract evidence from the video
+        analysis_input = extract_evidence(media_path, brief)
+        state["progress_message"] = "Running AI analysis…"
+
+        # Step 2 — send evidence to Granite
+        analysis_output = granite_analyze(analysis_input)
+
+        # Step 3 — persist to disk so it survives restarts
+        output_dict = analysis_output.model_dump()
+        output_path = pathlib.Path(settings.upload_dir) / project_id / "analysis_output.json"
+        output_path.write_text(json.dumps(output_dict, indent=2), encoding="utf-8")
+
+        state["analysis_output"] = output_dict
+        state["status"] = "completed"
+        state["progress_message"] = "Analysis complete."
+        log.info("project=%s analysis complete", project_id)
+
+    except Exception as exc:
+        state["status"] = "failed"
+        state["progress_message"] = f"Analysis failed: {exc}"
+        log.exception("project=%s analysis failed", project_id)
 
 
 @app.get("/api/projects/{project_id}/status", response_model=StatusResponse)
@@ -280,23 +324,82 @@ def get_analysis(project_id: str):
 
 
 @app.post("/api/projects/{project_id}/edits", response_model=SubmitEditsResponse)
-def submit_edits(project_id: str, body: SubmitEditsRequest):
-    """Accept a list of approved edit IDs and queue them for rendering."""
+def submit_edits(
+    project_id: str,
+    body: SubmitEditsRequest,
+    background_tasks: BackgroundTasks,
+):
+    """Accept approved edit IDs and queue silence removal rendering."""
     state = _require_project(project_id)
     if state["status"] != "completed":
         raise HTTPException(
             status_code=409,
             detail="Analysis must be completed before submitting edits",
         )
+
     accepted = [e.edit_id for e in body.approved_edits]
+
+    # Only silence_removal is supported in MVP
+    silence_requested = any("silence" in eid.lower() for eid in accepted)
+    if not silence_requested:
+        raise HTTPException(
+            status_code=400,
+            detail="Only 'silence_removal' edits are supported in MVP.",
+        )
+
     state["preview_status"] = "processing"
-    state["progress_message"] = f"Rendering {len(accepted)} edit(s)."
+    state["progress_message"] = "Rendering silence removal…"
+    background_tasks.add_task(_run_silence_removal, project_id)
     log.info("project=%s edits accepted=%s", project_id, accepted)
     return SubmitEditsResponse(
         project_id=project_id,
         accepted=accepted,
-        message=f"{len(accepted)} edit(s) accepted. Poll GET /preview for the result.",
+        message="Silence removal queued. Poll GET /preview for the result.",
     )
+
+
+def _run_silence_removal(project_id: str) -> None:
+    """Background worker: apply silence removal and update preview state."""
+    state = projects.get(project_id)
+    if state is None:
+        return
+
+    try:
+        media_path = state["media_path"]
+        analysis = state["analysis_output"] or {}
+
+        # Pull silence findings out of the stored analysis output
+        silence_findings = [
+            Finding(**f)
+            for f in analysis.get("findings", [])
+            if f.get("metric") == "silence_duration_seconds"
+        ]
+
+        # Fall back to findings stored in media_meta if analysis_output lacks them
+        if not silence_findings and state.get("media_meta"):
+            silence_findings = []
+
+        if not silence_findings:
+            log.warning("project=%s no silence findings — skipping render", project_id)
+            state["preview_status"] = "failed"
+            state["progress_message"] = "No silence gaps found to remove."
+            return
+
+        out_path = apply_silence_removal(media_path, silence_findings)
+
+        # Build a URL the browser can fetch
+        rel = pathlib.Path(out_path).relative_to(pathlib.Path(settings.upload_dir))
+        preview_url = f"/uploads/{rel.as_posix()}"
+
+        state["preview_url"] = preview_url
+        state["preview_status"] = "completed"
+        state["progress_message"] = "Preview ready."
+        log.info("project=%s preview ready url=%s", project_id, preview_url)
+
+    except Exception as exc:
+        state["preview_status"] = "failed"
+        state["progress_message"] = f"Render failed: {exc}"
+        log.exception("project=%s silence removal failed", project_id)
 
 
 @app.get("/api/projects/{project_id}/preview", response_model=PreviewResponse)
