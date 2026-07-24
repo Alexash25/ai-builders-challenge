@@ -1,6 +1,8 @@
 # ai-builders-challenge
 Month of July Challenge
 
+[IBM Bob Development Journal](docs/BOB_JOURNAL.md)
+
 python version: 3.12.4
 
 Initial Plan and Idea - AI Creative Director for Video
